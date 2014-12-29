@@ -85,11 +85,35 @@ module ActiveRecord
       end
 
       # Register a new column.
-      def column(name, sql_type = nil, default = nil, null = true)
-        tableless_options[:columns] << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+      if ActiveRecord::VERSION::STRING >= "4.2.0"
+        def column(name, symbol = nil, default = nil, null = true)
+          # from https://github.com/activescaffold/active_scaffold/blob/master/lib/active_scaffold/tableless.rb
+          sql_type = sql_type(symbol)
+          cast_type = ActiveRecord::Base.connection.send :lookup_cast_type, sql_type
+          tableless_options[:columns] << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type, null)
+        end
+
+        def sql_type(symbol)
+          case symbol
+          when :string
+            "character varying(255)"
+          when :integer
+            "integer"
+          when :datetime
+            "timestamp without time zone"
+          when :date
+            "date"
+          else
+            "character varying(255)"
+          end
+        end
+      else
+        def column(name, sql_type = nil, default = nil, null = true)
+          tableless_options[:columns] << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+        end
       end
 
-      # Register a set of colums with the same SQL type
+      # Register a set of columns with the same SQL type
       def add_columns(sql_type, *args)
         args.each do |col|
           column col, sql_type
